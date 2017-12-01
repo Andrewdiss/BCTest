@@ -1,5 +1,6 @@
 import hashlib
 import json
+import requests
 from textwrap import dedent
 from time import time
 from uuid import uuid4
@@ -63,15 +64,16 @@ class BlockChain(object):
         """
 
         neighbors = self.nodes
+        # print (neighbors)
         new_chain = None
 
         # Looking for  chains that`s Only longer than ours
-        max_length = None
+        max_length = len(self.chain)
 
         # Grab & verify the chains from all nodes in our netWork
 
         for node in neighbors:
-            response = request.get("http://{0}/chain".format(node))
+            response = requests.get("http://{}/chain".format(node))
 
             if response.status_code == 200:
                 length = response.json()['length']
@@ -188,6 +190,40 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = BlockChain()
 
 
+@app.route('/nodes/register', methods=['POST'])
+def register_nodes():
+    values = request.get_json()
+
+    nodes = values.get('nodes')
+    if nodes is None:
+        return "Error epta: Please supply a valid list of nodes", 400
+
+    for node in nodes:
+        blockchain.register_node(node)
+
+    response = {
+        'message': 'New nodes have been added',
+        'total_nodes': list(blockchain.nodes),
+    }
+
+    return jsonify(response), 201
+
+
+
+
+@app.route('/nodes/resolve', methods=['GET'])
+def consensus():
+    replaced = blockchain.resolve_coflicts()
+
+    if replaced:
+        response = {
+            'message': "Our chain was replaced",
+            'chain': blockchain.chain
+        }
+
+    return jsonify(response), 200
+
+
 @app.route('/mine', methods=['GET'])
 def mine():
     # We run the proof of work algorithm to get new proof
@@ -245,6 +281,20 @@ def full_chain():
         'length': len(blockchain.chain),
     }
     return jsonify(response), 200   # remove FLASK
+
+
+@app.route('/nodes/all', methods=['GET'])
+def spectateNodes():
+    if blockchain.nodes:
+        response = {
+            'nodes': list(blockchain.nodes)
+        }
+    else:
+        response = {
+        'bla bla bla': "@HUy na"
+        }
+
+    return jsonify(response), 200
 
 
 if __name__ == '__main__':
